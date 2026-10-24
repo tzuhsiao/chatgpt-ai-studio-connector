@@ -1,0 +1,3 @@
+import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
+export const requests = sqliteTable('requests', { owner: text('owner').notNull(), requestId: text('request_id').notNull(), state: text('state').notNull(), fingerprint: text('fingerprint').notNull().default(''), createdAt: integer('created_at').notNull(), result: text('result') }, t=>[primaryKey({columns:[t.owner,t.requestId]})]);
+export const budget = sqliteTable('budget', { owner: text('owner').notNull(), window: text('window').notNull(), count: integer('count').notNull() }, t=>[primaryKey({columns:[t.owner,t.window]})]);

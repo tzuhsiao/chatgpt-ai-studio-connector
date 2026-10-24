@@ -1,0 +1,1 @@
+ALTER TABLE `requests` ADD `fingerprint` text DEFAULT '' NOT NULL;
