@@ -73,13 +73,23 @@ The connector immediately stores the returned provider interaction ID privately 
 
 ## Verification
 
-`node --import tsx --test tests/*.test.ts`
+`npm test`
 
 `npx tsc --noEmit`
 
 `node <Sites plugin directory>/scripts/build-site.mjs`
 
 Tests use in-memory SQLite, mock object storage and mock HTTP. They cover authorization, per-user isolation, MCP discovery, quotas, idempotency, error redaction, large base64 media, TTS mapping, music output, legacy generation and real-SDK Interactions serialization. **No real API key or live Google generation was used for the initial build.** Actual model eligibility remains unverified until the owner configures the key and authorizes a request.
+
+## Repository layout
+
+- `app/`: the upload/status page and protected file, status, and MCP routes.
+- `lib/`: Gemini request handling, MCP dispatch, bounded readback, streaming, and safe diagnostics.
+- `db/schema.ts` and `drizzle/`: request/quota schema and database migrations.
+- `build/`, `scripts/`, and `vite.config.ts`: the Sites Worker entrypoint and active npm/build tooling.
+- `tests/`: mocked connector behavior tests; `tsx` is an explicit development dependency.
+
+The unused starter UI library, examples, connected-app preview bridge, and pnpm-only installer have been removed. The current page and connector do not use those components. Sites authentication, D1/R2 bindings, and the existing Google SDK remain in place.
 
 ## Official references
 
