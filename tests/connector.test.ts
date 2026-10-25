@@ -440,7 +440,7 @@ test('Omni preflight counts both endpoint images and preserves the authorized co
 
 test('connector status and MCP initialize advertise the same release and guidance', async () => {
     const e = env(); const current = await status(e, 'u1');
-    assert.equal(current.version, '1.6.4'); assert.match(current.usage_guidance, /video_config.task=image_to_video/); assert.match(current.usage_guidance, /at most two images/); assert.match(current.usage_guidance, /<LAST_FRAME>@Image2/);
+    assert.equal(current.version, '1.6.5'); assert.match(current.usage_guidance, /video_config.task=image_to_video/); assert.match(current.usage_guidance, /at most two images/); assert.match(current.usage_guidance, /<LAST_FRAME>@Image2/);
     const response = await handleMcp(new Request('https://unit.test/mcp', { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) }), e);
     const body: any = await response.json(); assert.equal(body.result.serverInfo.version, current.version); assert.equal(body.result.instructions, current.usage_guidance);
 });

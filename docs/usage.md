@@ -1,6 +1,6 @@
 # Usage reference
 
-This connector exposes Google GenAI through MCP tools and a Sites-hosted upload page.
+This connector exposes Google GenAI through MCP tools and a Sites-hosted status and file browser.
 
 ## Tools
 
@@ -20,7 +20,7 @@ The default API is Interactions. The optional `generate_content` path supports l
 
 Every generation requires a UUID `request_id` and `cost_acknowledged: true`. Reusing an ID with the same input returns the existing request; different input with that ID is rejected. After an uncertain result, inspect the original ID rather than automatically resubmitting.
 
-Inputs can be text or references to files uploaded through the connector. File inputs use `file_id` UUIDs rather than arbitrary URLs or local paths. Accepted formats include supported audio and image MIME types, MP4, WebM, and PDF. Files are stored in the authenticated owner's namespace; selected input bytes are sent to Google when generation is requested. Files are not automatically deleted.
+Inputs can be text or references to files uploaded through the MCP `upload_file` tool (up to 8 MiB per file). File inputs use `file_id` UUIDs rather than arbitrary URLs or local paths. Accepted formats include supported audio and image MIME types, MP4, WebM, and PDF. Files are stored in the authenticated owner's namespace; selected input bytes are sent to Google when generation is requested. Files are not automatically deleted.
 
 Generated text and media are saved with request results and authenticated download links. Raw PCM audio is wrapped as WAV. Provider output is not automatically quality-verified.
 
