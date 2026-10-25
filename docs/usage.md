@@ -108,6 +108,10 @@ Authentication depends on the trusted Sites ingress. Moving to another host requ
 
 Tests use in-memory SQLite, mock object storage, and mock HTTP. They cover authorization, owner isolation, quotas, request deduplication, request serialization, streaming, and error handling without live Google generation.
 
+## Maintenance
+
+MCP initialization and `connector_status` include maintenance instructions for the assistant. With connected GitHub/development tools and the owner's authorization, it can investigate visible failures, search existing reports, file a sanitized issue, or open a tested draft PR in this repository. Paid generation is not retried for diagnosis; merging and deployment need separate authorization. This is assistant guidance, not a background monitoring service or guaranteed repair.
+
 ## References
 
 - [Gemini Interactions API](https://ai.google.dev/gemini-api/docs/interactions-overview)
