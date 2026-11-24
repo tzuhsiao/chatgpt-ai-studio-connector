@@ -40,7 +40,12 @@ export function safeError(error: unknown) {
         cause='cause' in cause ? cause.cause : undefined;
     }
     if (error instanceof ConnectorError) return { code: error.code, message: error.message };
-    if (error instanceof z.ZodError) return { code: 'INVALID_INPUT', message: 'Invalid input. Check required fields, supported options, and size limits.' };
+    if (error instanceof z.ZodError) {
+        if (error.issues.some(issue => issue.path.length === 1 && issue.path[0] === 'request_id')) {
+            return { code: 'INVALID_REQUEST_ID', message: 'request_id must be a UUID. For a new generation, create and save one before submitting. To check an existing generation, pass its original UUID to get_request.' };
+        }
+        return { code: 'INVALID_INPUT', message: 'Invalid input. Check required fields, supported options, and size limits.' };
+    }
     if (error instanceof InteractionStreamFailure) {
         const timeout = error.kind === 'timeout' || /Timeout/.test(errorMetadata(error.originalError).error_type ?? '');
         return { code: timeout ? 'GOOGLE_TIMEOUT' : error.kind === 'output_limit' ? 'GOOGLE_STREAM_LIMIT' : 'GOOGLE_STREAM_INTERRUPTED', message: timeout ? 'Google did not finish within the streaming time limit. Partial output may be available. Charges are possible; do not automatically generate again.' : 'The Google stream did not complete. Partial output may be available. Charges are possible; do not automatically generate again.' };

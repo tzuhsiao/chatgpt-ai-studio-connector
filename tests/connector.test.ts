@@ -9,6 +9,54 @@ function env(): Env { const db = new DatabaseSync(':memory:'); for (const f of r
 const args = () => ({ request_id: crypto.randomUUID(), cost_acknowledged: true as const, model: 'gemini-3.8-flash', input: 'Test content' });
 test('owner identity required and isolated', () => { const e = env(); assert.throws(() => ownerFromHeaders(new Headers(), e)); assert.throws(() => ownerFromHeaders(new Headers({ 'oai-authenticated-user-id': 'x', 'oai-authenticated-user-email': 'other@example.com' }), e)); assert.equal(ownerFromHeaders(new Headers({ 'oai-authenticated-user-id': 'u1', 'oai-authenticated-user-email': 'owner@example.com' }), e), 'u1'); });
 test('discovery public but data-bearing MCP calls protected', async () => { const e = env(); const req = (method: string, params = {}) => new Request('https://unit.test/mcp', { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) }); assert.equal((await handleMcp(req('tools/list'), e)).status, 200); assert.equal((await handleMcp(req('tools/call', { name: 'connector_status' }), e)).status, 401); assert.equal((await handleMcp(new Request('https://unit.test/mcp', { method: 'POST', headers: { Origin: 'https://evil.test' }, body: '{}' }), e)).status, 403); });
+test('MCP request ID errors name the field without touching storage or Google', async (t) => {
+    const e = env();
+    e.GEMINI_API_KEY = 'test-only-not-a-secret';
+    let storageCalls = 0;
+    e.DB = { prepare() { storageCalls++; throw new Error('Unexpected DB access'); } } as unknown as Env['DB'];
+    e.BUCKET = { get() { storageCalls++; throw new Error('Unexpected object access'); }, put() { storageCalls++; throw new Error('Unexpected object write'); } } as unknown as Env['BUCKET'];
+    const fetchMock = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Unexpected provider call'); });
+    const call = async (name: string, input: Record<string, unknown>) => {
+        const res = await handleMcp(new Request('https://unit.test/mcp', {
+            method: 'POST',
+            headers: { 'oai-authenticated-user-id': 'u1', 'oai-authenticated-user-email': 'owner@example.com' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: input } }),
+        }), e);
+        const rpc = await res.json() as { result: { isError: boolean, content: Array<{text: string}> } };
+        assert.equal(rpc.result.isError, true);
+        return JSON.parse(rpc.result.content[0].text).error as {code: string; message: string};
+    };
+    try {
+        for (const request_id of ['private-purpose-label', undefined, 123]) {
+            for (const name of ['generate', 'get_request']) {
+                const result = await call(name, name === 'generate' ? { ...args(), request_id } : { request_id });
+                assert.equal(result.code, 'INVALID_REQUEST_ID');
+                assert.match(result.message, /request_id.*UUID/);
+                assert.doesNotMatch(result.message, /private-purpose-label/);
+            }
+        }
+        assert.equal((await call('generate', { ...args(), cost_acknowledged: false })).code, 'INVALID_INPUT');
+        assert.equal(storageCalls, 0);
+        assert.equal(fetchMock.mock.callCount(), 0);
+    } finally {
+        fetchMock.mock.restore();
+    }
+});
+
+test('MCP advertises the caller UUID lifecycle, distinct from file IDs', () => {
+    const generateTool = TOOLS.find(tool => tool.name === 'generate')!;
+    const lookupTool = TOOLS.find(tool => tool.name === 'get_request')!;
+    for (const tool of [generateTool, lookupTool]) {
+        assert.equal(tool.inputSchema.properties.request_id.format, 'uuid');
+        assert.ok(tool.inputSchema.required.includes('request_id'));
+    }
+    assert.match(generateTool.inputSchema.properties.request_id.description, /crypto\.randomUUID\(\)/);
+    assert.match(generateTool.inputSchema.properties.request_id.description, /save.*before/i);
+    assert.match(generateTool.inputSchema.properties.request_id.description, /get_request/);
+    assert.match(lookupTool.inputSchema.properties.request_id.description, /original.*generate/i);
+    assert.equal(TOOLS.find(tool => tool.name === 'read_file_chunk')!.inputSchema.properties.file_id.description, undefined);
+});
+
 test('missing key never calls provider', async () => { const e = env(); await assert.rejects(generate(e, 'u1', args()), /GEMINI_API_KEY/); assert.equal((await status(e, 'u1')).key_configured, false); });
 test('invalid fields, tool execution, model URL and oversized token limits rejected', () => { for (const patch of [{ cost_acknowledged: false }, { max_output_tokens: 9000 }, { model: 'https://evil.test' }, { tools: [{ codeExecution: {} }] }, { httpOptions: { baseUrl: 'https://evil.test' } }, { input: [{ type: 'audio', uri: 'https://evil.test/audio' }] }])
     assert.throws(() => generationSchema.parse({ ...args(), ...patch })); });
