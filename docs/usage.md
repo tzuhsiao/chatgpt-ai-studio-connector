@@ -18,7 +18,7 @@ This connector exposes Google GenAI through MCP tools and a Sites-hosted status 
 
 The default API is Interactions. The optional `generate_content` path supports legacy generation. Model and modality availability depend on Google's account access.
 
-Every generation requires a UUID `request_id` and `cost_acknowledged: true`. Reusing an ID with the same input returns the existing request; different input with that ID is rejected. After an uncertain result, inspect the original ID rather than automatically resubmitting.
+Every generation requires a UUID `request_id` and `cost_acknowledged: true`. Reusing an ID with the same input returns the existing request; different input with that ID is rejected. After an uncertain result, inspect the original ID with `get_request` rather than automatically resubmitting. A missing or malformed ID returns `INVALID_REQUEST_ID` before anything is stored or sent to Google; a new generation needs explicit user authorization and a fresh random UUID, never an example or placeholder value.
 
 Inputs can be text or references to files uploaded through the MCP `upload_file` tool (up to 8 MiB per file). File inputs use `file_id` UUIDs rather than arbitrary URLs or local paths. Accepted formats include supported audio and image MIME types, MP4, WebM, and PDF. Files are stored in the authenticated owner's namespace; selected input bytes are sent to Google when generation is requested. Files are not automatically deleted.
 

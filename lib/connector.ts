@@ -101,7 +101,7 @@ export function client(env: Env, polling = false, onMetrics?: (metrics: Readback
     throw new ConnectorError('NOT_CONFIGURED', 'Add GEMINI_API_KEY as a secret in Sites Settings, then redeploy.', 409); return new GoogleGenAI({ apiKey: env.GEMINI_API_KEY, apiVersion: 'v1beta', httpOptions: { timeout: LIMITS.timeoutMs, retryOptions: { attempts: 1 }, ...(polling ? {fetch:filteredProviderFetch(videoMedia ? LIMITS.videoPollResponseBytes : LIMITS.pollResponseBytes,LIMITS.pollReadBytes,globalThis.fetch,onMetrics,videoMedia,onRequestAuth)} : {}) } }); }
 export async function status(env: Env, owner: string) { const day = new Date().toISOString().slice(0, 10); const used = await env.DB.prepare('SELECT count FROM budget WHERE owner=? AND window=?').bind(owner, `generation:${day}`).first<{
     count: number;
-}>(); return { name: 'AI Studio Connector', version: '1.6.5', sdk: '@google/genai 2.26.0', key_configured: Boolean(env.GEMINI_API_KEY), google_connection_verified: false, access: 'owner_only', limits: { ...LIMITS, generationsPerDay: dailyLimit(env), generationAttemptsToday: used?.count ?? 0 }, setup_url: 'https://chatgpt.com/sites', setup: 'AI Studio Connector → More actions → Settings → add GEMINI_API_KEY marked secret → redeploy', usage_guidance: GUIDANCE }; }
+}>(); return { name: 'AI Studio Connector', version: '1.6.6', sdk: '@google/genai 2.26.0', key_configured: Boolean(env.GEMINI_API_KEY), google_connection_verified: false, access: 'owner_only', limits: { ...LIMITS, generationsPerDay: dailyLimit(env), generationAttemptsToday: used?.count ?? 0 }, setup_url: 'https://chatgpt.com/sites', setup: 'AI Studio Connector → More actions → Settings → add GEMINI_API_KEY marked secret → redeploy', usage_guidance: GUIDANCE }; }
 function checkJson(value: unknown, depth = 0) { if (depth > 12)
     throw new ConnectorError('INVALID_SCHEMA', 'Response schema is too deep.'); if (Array.isArray(value)) {
     for (const v of value)
@@ -316,7 +316,7 @@ export async function generate(env: Env, owner: string, args: unknown, provider?
     const inserted = await env.DB.prepare("INSERT OR IGNORE INTO requests (owner,request_id,state,created_at,fingerprint) VALUES (?,?,'running',?,?)").bind(owner, a.request_id, Date.now(), fingerprint).run();
     if (inserted.meta.changes !== 1) {
         const previous = await env.DB.prepare('SELECT fingerprint FROM requests WHERE owner=? AND request_id=?').bind(owner, a.request_id).first<{fingerprint:string}>();
-        if (previous?.fingerprint !== fingerprint) throw new ConnectorError('REQUEST_ID_CONFLICT','This request ID belongs to different input. Use the original request or explicitly authorize a new generation.',409);
+        if (previous?.fingerprint !== fingerprint) throw new ConnectorError('REQUEST_ID_CONFLICT','This request ID belongs to different input. If this is a retry of your earlier request, call get_request with this ID and do not resubmit. Use a fresh random UUID only if the user explicitly authorizes a new generation; never use an example or placeholder UUID.',409);
         return requestStatus(env, owner, a.request_id);
     }
     const startedAt = Date.now();

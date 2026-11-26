@@ -50,7 +50,8 @@ test('MCP advertises the caller UUID lifecycle, distinct from file IDs', () => {
         assert.equal(tool.inputSchema.properties.request_id.format, 'uuid');
         assert.ok(tool.inputSchema.required.includes('request_id'));
     }
-    assert.match(generateTool.inputSchema.properties.request_id.description, /crypto\.randomUUID\(\)/);
+    assert.match(generateTool.inputSchema.properties.request_id.description, /fresh random UUID/);
+    assert.match(generateTool.inputSchema.properties.request_id.description, /never an example or placeholder/);
     assert.match(generateTool.inputSchema.properties.request_id.description, /save.*before/i);
     assert.match(generateTool.inputSchema.properties.request_id.description, /get_request/);
     assert.match(lookupTool.inputSchema.properties.request_id.description, /original.*generate/i);
@@ -69,7 +70,20 @@ test('base64 validated and PCM wrapped as WAV', () => { assert.throws(() => deco
 test('legacy generateContent maps structured schema without extra SDK capabilities', async () => { const e = env(); const r: any = await buildRequest(e, 'u1', generationSchema.parse({ ...args(), api: 'generate_content', response_format: { type: 'object', properties: { answer: { type: 'string' } } } })); assert.equal(r.config.responseMimeType, 'application/json'); assert.equal(r.config.candidateCount, 1); assert.equal(r.contents[0].parts[0].text, 'Test content'); assert.equal(r.config.tools, undefined); });
 test('real SDK serializes Interactions request against mock fetch only', async () => { const e = env(); const request: any = await buildRequest(e, 'u1', generationSchema.parse(args())); let calls = 0; const fakeFetch = async (input: any, init?: any) => { calls++; const url = typeof input === 'string' ? input : input.url; assert.match(url, /generativelanguage.googleapis.com\/v1beta\/interactions/); const body = typeof input === 'string' ? JSON.parse(init.body) : await input.json(); assert.equal(body.store, false); assert.equal(body.model, 'gemini-3.8-flash'); return new Response(JSON.stringify({ id: 'mock', status: 'completed', steps: [{ type: 'model_output', content: [{ type: 'text', text: 'Mock answer' }] }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }); }; const sdk = new GoogleGenAI({ apiKey: 'test-only-not-a-secret', httpOptions: { fetch: fakeFetch, retryOptions: { attempts: 1 } } }); const result = await sdk.interactions.create(request as any, { maxRetries: 0 }); assert.equal(calls, 1); assert.equal(result.steps[0].type, 'model_output'); });
 
-test('request ID collision with different input is rejected',async()=>{const e=env();const a=args();const mock=async()=>({output_text:'ok'});await generate(e,'u1',a,mock);await assert.rejects(generate(e,'u1',{...a,input:'different'},mock),/different input/);});
+test('request ID collision with different input is rejected without resubmitting or echoing the ID',async()=>{
+    const e=env();const a=args();let calls=0;const mock=async()=>{calls++;return {output_text:'ok'};};
+    await generate(e,'u1',a,mock);
+    await assert.rejects(generate(e,'u1',{...a,input:'different'},mock),(error: unknown)=>{
+        const safe=safeError(error);
+        assert.equal(safe.code,'REQUEST_ID_CONFLICT');
+        assert.match(safe.message,/different input/);
+        assert.match(safe.message,/get_request.*do not resubmit/);
+        assert.match(safe.message,/only if the user explicitly authorizes a new generation/);
+        assert.doesNotMatch(safe.message,new RegExp(a.request_id));
+        return true;
+    });
+    assert.equal(calls,1);
+});
 
 test('valid multi-MiB media does not overflow decoder stack',()=>{for(const n of [8*1024*1024,20*1024*1024]){const bytes=Buffer.alloc(n,1);assert.equal(decodeBase64(bytes.toString('base64'),n).length,n);}});
 test('minute cap limits requests even with daily quota available',async()=>{const e=env();let calls=0;const mock=async()=>{calls++;return{output_text:'ok'};};for(let i=0;i<4;i++)await generate(e,'u1',args(),mock);assert.equal(calls,3);});
@@ -488,7 +502,7 @@ test('Omni preflight counts both endpoint images and preserves the authorized co
 
 test('connector status and MCP initialize advertise the same release and guidance', async () => {
     const e = env(); const current = await status(e, 'u1');
-    assert.equal(current.version, '1.6.5'); assert.match(current.usage_guidance, /video_config.task=image_to_video/); assert.match(current.usage_guidance, /at most two images/); assert.match(current.usage_guidance, /<LAST_FRAME>@Image2/);
+    assert.equal(current.version, '1.6.6'); assert.match(current.usage_guidance, /video_config.task=image_to_video/); assert.match(current.usage_guidance, /at most two images/); assert.match(current.usage_guidance, /<LAST_FRAME>@Image2/);
     const response = await handleMcp(new Request('https://unit.test/mcp', { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) }), e);
     const body: any = await response.json(); assert.equal(body.result.serverInfo.version, current.version); assert.equal(body.result.instructions, current.usage_guidance);
 });
